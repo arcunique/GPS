@@ -1,0 +1,2 @@
+*.df5 filter=lfs diff=lfs merge=lfs -text
+*.pk filter=lfs diff=lfs merge=lfs -text
