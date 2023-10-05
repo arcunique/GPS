@@ -45,7 +45,7 @@ def get_model(models='all', lossmechs='all', startypes='all', snowline='fid', or
         snowline = snowline_fiducial
     data = {}
     for model in models:
-        filename = model+'1.pk' if 'migration' in model else model+'.pk'
+        filename = model+'.pk' if 'migration' in model else model+'.pk'
         print(os.path.abspath(path))
         with open(os.path.join(path, filename), 'rb') as fr:
             dat = pkl.load(fr)
