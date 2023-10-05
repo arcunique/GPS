@@ -1,0 +1,5 @@
+{
+  "F": {"mass": 2, "Exuv": 1.04e+46, "snowline": 3, "Teq@1AU": 279},
+  "G": {"mass": 1, "Exuv": 5.2e+45, "snowline": 2.2, "Teq@1AU": 279},
+  "M": {"mass": 0.35, "Exuv": 2.08e+45, "snowline": 0.8, "Teq@1AU": 90}
+}
