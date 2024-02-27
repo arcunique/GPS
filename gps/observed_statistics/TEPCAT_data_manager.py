@@ -2,8 +2,8 @@ import os
 import pandas as pd
 from .obsdata_manager import ObsStats
 from .utils import get_value_with_error
-from source.gps.utils import per2sma, sma2per
-from source.gps.constants import RJ, RE, MJ, ME
+from ..source.utils import per2sma, sma2per
+from ..source.constants import RJ, RE, MJ, ME
 
 TEPCATfilepath = r"D:\Modeling\codes\GPS\source\data\TEPCAT"
 

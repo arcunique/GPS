@@ -10,8 +10,20 @@ with open(datapath('defstars.json')) as f:
 
 
 class GenSys:
+    '''
+    A class to define planetary systems
+    '''
 
     def __init__(self, system: (dict, str), star: (dict, str)):
+        '''
+        :param system: dictionary or file name from which the dict will be read. It needs to be in the format
+                      {"snapshots": {"mass: [], "sma": [], "t": [], ...}, "collisions":{"collision_time": [],
+                      "particle_i": [], "particle_j": []}, 'planets': {"plaent 1": {"bb": [], "id": 1}, ...}}
+                      type: dict or str
+
+        :param star: dictionary in the same format as each star type defined in "defstars" or a type (F, G, or M) given in defstars
+                     type: dict or str
+        '''
         self.sys = None
         self.imp_sum = []
         if system:
@@ -56,6 +68,7 @@ class GenSys:
                 print(e)
 
     def update_impact_phases(self):
+        ''' Updates masses of impacting bodies right before collision in the 'collisions' section '''
         # print('here')
         ss, co = self.sys['snapshots'], self.sys['collisions']
         t0 = ss['t'] == min(ss['t'])
@@ -74,7 +87,22 @@ class GenSys:
             #     mask1 = (co['particle_i'] == uid) & (co['mass_j'] != 0)
             #     ss['imp_mr_max'][mask & (ss['id'] == uid)] = np.max(co['mass_j'][mask1]/co['mass_i'][mask1])
 
-    def calc_wmf(self, check=True, wmf0_in=0, wmf0_out=0.5, snowline=None):
+    def calc_wmf(self, check=True, wmf0_in=0, wmf0_out=0.5, snowline=None, wmf0_func=None, key=None):
+        f'''
+        Calculates evolution (snapshots) of water mass-fraction that changes due to collisions and saves in the 
+        "snapshots" section with a new key which is either named as the argument "key" if provided or as f"{snowline:0.2f}"
+        :param check: if True checks whether the snowline key already exists in the "snapshots" section and skips if already exists, if False then calculates always 
+                      type: bool
+        :param wmf0_in: Inner wmf value in case a step function is assumed, "wmf0_func" should be None
+                        type: NoneType or int or float
+        :param wmf0_out: Outer wmf value in case a step function is assumed, "wmf0_func" should be None
+                         type: NoneType or int or float
+        :param snowline: Snowline distance from host star in AU in case a step function is assumed, "wmf0_func" should be None
+                         type: NoneType or int or float
+        :param wmf0_func: wmf as a function of the distance from host star in AU
+                          type: NoneType or function
+        :param key: if provided the value is stored under this key in the "snapshots" section else the key used is f"{snowline:0.2f}"
+        '''
         # print('here')
         if snowline is None:
             snowline = self.star['snowline']
@@ -86,7 +114,10 @@ class GenSys:
         t0 = tss == min(tss)
         cts = np.insert(np.insert(np.unique(co['collision_time']), 0, min(tss)), len(co['collision_time']) + 1, max(tss) + 1)
         bbs, sma0 = ss['id'][t0], ss['sma'][t0]
-        ifc = dict(zip(bbs, np.where(sma0 > snowline, wmf0_out, wmf0_in)))
+        if wmf0_func and callable(wmf0_func):
+            ifc = dict(zip(bbs, [wmf0_func(a) for a in sma0]))
+        else:
+            ifc = dict(zip(bbs, np.where(sma0 > snowline, wmf0_out, wmf0_in)))
         mc = {bbs[i]: ss['mass'][t0][i] for i in range(len(bbs))}
         ifss = np.zeros(len(tss))
         for i in range(len(cts) - 1):
@@ -98,7 +129,9 @@ class GenSys:
                                     co['particle_j'][co['collision_time'] == cts[i + 1]]):
                     ifc[bbi] = (mc[bbi] * ifc[bbi] + mc[bbj] * ifc[bbj]) / (mc[bbi] + mc[bbj])
                     mc[bbi] += mc[bbj]
-        ss[f'if_{snowline:0.2f}'] = ifss
+        if key is None:
+            key = f'if_{snowline:0.2f}'
+        ss[key] = ifss
 
     @property
     def available_symbols(self):
@@ -128,6 +161,13 @@ class GenSys:
         return arrs
 
     def get_state(self, *args, bb_only=True, time=-1):
+        '''
+        Returns a dataFrame with states of "snapshots" variables as each column, e,g. states of "t", "mass", "sma", etc. at a point of time
+        :param args: The keys from the "snapshots" section or their shorthands: "m" for "mass", "T" for Teq, "a" for "sma", "p" for period, "wf" for default wmf
+        :param bb_only: if True, considers only those building block ids that make up the final planets and ignores other ids
+        :param time: at what time the states are calculated (default=-1), 0 and -1 imply the initial and final states respectively
+        :return: Pandas DataFrame
+        '''
         if not args:
             args = self.available_symbols
         if time != 'all':
@@ -142,10 +182,6 @@ class GenSys:
             tc &= np.isin(self.sys['snapshots']['id'], np.array([val['id'] for val in self.sys['planets'].values()]))
         if 'ims' in args:
             self.get_impact_phase_summary(bb_only=False)
-        # print(args)
-        # print(self.decode_symbols(*args))
-        # print(pd.DataFrame(dict(zip(args, [arr[tc] for arr in self.decode_symbols(*args)]))))
-        # print(len(tc), len(self.sys['snapshots']['t']))
         for arr in self.decode_symbols(*args):
             try:
                 arr[tc]
@@ -160,13 +196,9 @@ class GenSys:
         if bb_only:
             tf &= np.isin(self.sys['snapshots']['id'], np.array([val['id'] for val in self.sys['planets'].values()]))
         return np.array([{key: val[co['particle_i'] == bb] for key, val in co.items()} for bb in ss['id'][tf]])
-        # print(len(self.imp_sum))
-        # self.imp_sum = [{} for _ in range(sum(tf))]
-        # for i in range(sum(tf)):
-        #     if ss['id'][tf][i] in co['particle_i']:
-        #         self.imp_sum[i] = {key: val[co['particle_i'] == ss['id'][tf][i]] for key, val in co.items()}
 
     def get_resonance_status(self, time=-1, bb_only=False):
+        ''' Calculates if the planets are in resonance chain or broken'''
         ss, pb = self.sys['snapshots'], self.sys['planets']
         prres = np.array([1, 7/6, 6/5, 5/4, 4/3, 7/5, 3/2, 5/3, 2, 3])
         if time == -1 or time >= max(ss['t']):
@@ -186,8 +218,21 @@ class GenSys:
 
 
 class GenPop:
-
+    '''
+    A class to define a population of planetary systems
+    '''
     def __init__(self, genfile, models='all', star=''):
+        '''
+
+        :param genfile: dictionary or file name from which the dict will be read.
+                        type: dict or str
+        :param models: model name or a list of model names or "all" models (default 'all') to be chosen from the dict.
+                       It can also be a function that returns True/False for each model in the dict. In that case, the
+                       models for which the function returns True will be selected.
+                       type: str or list or function
+        :param star: dictionary in the same format as each star type defined in "defstars" or a type (F, G, or M) given in defstars
+                     type: dict or str
+        '''
         self.models = {}
         if genfile:
             self.load_genesis(genfile, models, star)
@@ -212,6 +257,15 @@ class GenPop:
         self.systems = {(mod, run): GenSys(self.models[mod][run], star) for mod in self.models for run in self.models[mod]}
 
     def filter_runs_by_res_chain_break(self, f=0.95, time=-1, bb_only=False):
+        '''
+        Selects systems in resonance and in broken resonance in the given ratio
+        :param f: Fraction of all systems that are supposed to have broken resonance chains
+                  type: float
+        :param time: Time at which the resonance status is checked. 0 and -1 imply initial and final times resp.
+                     type: int or float
+        :param bb_only: If the resonance will be checked for building blocks making up the final planets (True or False)
+        :return: status in dict format
+        '''
         reson = []
         Nbreak = 0
         Nsingle = 0
@@ -253,6 +307,7 @@ class GenPop:
         return 'm', 'T', 'a', 'p', 'wf', 'ims', 'sys'
 
     def get_state(self, *args, bb_only=True, time=-1):
+        ''' Same as get_state function of GenSys '''
         dfs = []
         if not args:
             args = self.available_symbols
