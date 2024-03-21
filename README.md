@@ -1,4 +1,4 @@
-[![Build Status](https://img.shields.io/badge/release-0.1-orange)](https://github.com/arcunique/Cplotter)
+[![Build Status](https://img.shields.io/badge/release-1.0-orange)](https://github.com/arcunique/Cplotter)
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-371/)
 
 GPS (Genesis Population Synthesis)  
